@@ -1,4 +1,4 @@
-name: fast-api CD pipeline
+name: FastAPI CD Pipeline
 
 on:
   push:
@@ -9,43 +9,50 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-    - name: Deploy to AWS EC2
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USERNAME }}
-        key: ${{ secrets.EC2_PRIVATE_KEY }}
-        script: |
-          # Update package list
-          sudo apt-get update -y
+      - name: Deploy to AWS EC2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_PRIVATE_KEY }}
+          script: |
+            # Update package list
+            sudo apt-get update -y
 
-          # Install necessary packages
-          sudo apt-get install transport-https ca-certificates curl software-properties-common -y
+            # Install necessary packages
+            sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
 
-          # Add Docker's official GPG key
-          sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+            # Add Docker's official GPG key
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
 
-          # Set up the Docker stable repository
-          sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+            # Set up the Docker stable repository
+            echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-          # Update package list again to install and include Docker packages
-          sudo apt-get update -y
-          sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+            # Update package list again to include Docker packages
+            sudo apt-get update -y
 
-          # Add the current user to the docker group
-          sudo usermod -aG docker ${{ secrets.EC2_USERNAME }}
-          sudo curl -L "https://github.com/docker/compose/releases/download/2.20.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-          sudo chmod +x /usr/local/bin/docker-compose
+            # Install Docker
+            sudo apt-get install -y docker-ce docker-ce-cli containerd.io
 
-          # Check Docker and Docker Compose versions
-          docker --version
-          docker-compose --version
+            # Add the current user to the docker group
+            sudo usermod -aG docker ${{ secrets.EC2_USERNAME }}
 
-          # Clone the repository
-          cd /home/ubuntu/
-          git clone https://github.com/Khun111/fastapi-book-project.git
-          cd fastapi-book-project
+            # Reload the user's group membership
+            newgrp docker
 
-          # Start the application
-          git pull
-          docker-compose up -d --build
+            # Install Docker Compose
+            sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+
+            # Verify Docker and Docker Compose installations
+            docker --version
+            docker-compose --version
+
+            # Clone the repository
+            cd /home/ubuntu/
+            git clone https://github.com/Khun111/fastapi-book-project.git
+            cd fastapi-book-project
+
+            # Start the application
+            git pull
+            docker-compose up -d --build
